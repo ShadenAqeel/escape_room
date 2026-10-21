@@ -65,10 +65,10 @@ def progress_text(room):
 
 # Map navigation as saved picture for each room
 All_Maps = {
-    "basement": "Basement_map.png",
-    "majlis": "Majilis_map.png",
-    "study": "Study_map.png",
-    "courtyard": "Courtyard_map.png",
+    "basement": "Basement_map.webp",
+    "majlis": "Majilis_map.webp",
+    "study": "Study_map.webp",
+    "courtyard": "Courtyard_map.webp",
 }
 
 @st.dialog("Map", width="medium")
@@ -118,7 +118,7 @@ def show_notebook():
             st.write(clue)
             if puzzle == "coffee":
                 room_2_display.show_picture(
-                    "coffee_table.png", 362, 254, 611, 506, max_width=220
+                    "coffee_table.webp", 362, 254, 611, 506, max_width=220
                 )
 
 
@@ -143,21 +143,21 @@ def show_navigations():
     }
 
     .st-key-nav_map button {
-        background-image: url("app/static/location.png");
+        background-image: url("app/static/location.webp");
         background-size: 40px;
         background-position: center;
         background-repeat: no-repeat;
     }
 
     .st-key-nav_notebook button {
-        background-image: url("app/static/notes.png");
+        background-image: url("app/static/notes.webp");
         background-size: 40px;
         background-position: center;
         background-repeat: no-repeat;
     }
 
     .st-key-nav_phone button {
-        background-image: url("app/static/smartphone.png");
+        background-image: url("app/static/smartphone.webp");
         background-size: 40px;
         background-position: center;
         background-repeat: no-repeat;

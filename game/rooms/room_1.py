@@ -7,6 +7,46 @@ import base64
 
 # Python script for the basement room: all related functions (puzzles) and the page interface 
 
+@st.cache_data(show_spinner=False)
+def cached_picture(image_path, modified_time):
+    # Convert once, then reuse until the image changes.
+    return base64.b64encode(
+        Path(image_path).read_bytes()
+    ).decode("utf-8")
+
+
+def show_picture(file_name, max_width=360):
+    root = Path(__file__).resolve().parents[2]
+    image_path = root / "assets" / "images" / "room_1" / file_name
+
+    picture = cached_picture(
+        str(image_path),
+        image_path.stat().st_mtime_ns
+    )
+
+    # Room 1 already has separate puzzle pictures, so no cropping is needed.
+    st.markdown(
+        f"""
+        <div style="
+            width: min(100%, {max_width}px);
+            margin: .4rem auto 1rem;
+            overflow: hidden;
+            border-radius: 9px;
+            border: 1px solid #68665f;
+        ">
+            <img
+                src="data:image/webp;base64,{picture}"
+                alt="Puzzle close-up"
+                style="width:100%; height:auto; display:block;"
+            >
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+
+
 # ------------------------------------ Puzzle Functions (Logic part) ------------------------------------
 
 # 1. First puzzle 
@@ -150,38 +190,90 @@ def setup():
 # Styling the popup 
 def apply_style():
     st.markdown(
-    """
-    <style>
+        """
+        <style>
+        div[data-testid="stDialog"] div[role="dialog"] {
+            background-color: #252826;
+            border: 1px solid rgba(255, 255, 255, .15);
+            border-radius: 12px;
+        }
 
-    /* Start Generator button */
-    div[data-testid="stDialog"] button[kind="primary"] {
-        background-color: #5f6959;
-        color: #f1eee6;
-        border: 1px solid #747f6d;
-        border-radius: 8px;
-    }
+        div[data-testid="stDialog"] button[kind="primary"] {
+            background-color: #5f6959;
+            color: #f1eee6;
+            border: 1px solid #747f6d;
+            border-radius: 8px;
+        }
 
-    /* Start Generator hover */
-    div[data-testid="stDialog"] button[kind="primary"]:hover {
-        background-color: #6c7765;
-        color: #ffffff;
-        border-color: #899482;
-    }
+        div[data-testid="stDialog"] button[kind="primary"]:hover {
+            background-color: #6c7765;
+            color: #ffffff;
+            border-color: #899482;
+        }
 
-    /* Normal buttons inside the popup */
-    div[data-testid="stDialog"] button[kind="secondary"] {
-        border-radius: 8px;
-    }
+        div[data-testid="stDialog"] .stButton > button,
+        div[data-testid="stDialog"] .stFormSubmitButton > button {
+            min-height: 44px;
+            border-radius: 8px;
+        }
 
-    div[data-testid="stDialog"] .stButton > button {
-    min-height: 48px;
-    border-radius: 8px;
-    }
+        .st-key-generator_switch_controls button {
+            width: 100% !important;
+            height: 44px !important;
+            min-height: 44px !important;
+            padding: 0 4px !important;
+        }
 
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+        .st-key-generator_switch_controls button p {
+            font-size: 14px !important;
+            white-space: nowrap !important;
+        }
+
+        /* Keep popup input fields visible before clicking. */
+        div[data-testid="stDialog"] [data-testid="stTextInput"] {
+            opacity: 1 !important;
+        }
+
+        div[data-testid="stDialog"]
+        [data-testid="stTextInput"] [data-baseweb="input"] {
+            background-color: #353a35 !important;
+            border: 1px solid #9aa58f !important;
+            border-radius: 8px !important;
+        }
+
+        div[data-testid="stDialog"]
+        [data-testid="stTextInput"] input {
+            background-color: #353a35 !important;
+            color: #f1eee6 !important;
+            -webkit-text-fill-color: #f1eee6 !important;
+            caret-color: #f1eee6 !important;
+            opacity: 1 !important;
+        }
+
+        div[data-testid="stDialog"]
+        [data-testid="stTextInput"] input::placeholder {
+            color: #bfc5b8 !important;
+            -webkit-text-fill-color: #bfc5b8 !important;
+            opacity: 1 !important;
+        }
+
+        div[data-testid="stDialog"]
+        [data-testid="stTextInput"] label,
+        div[data-testid="stDialog"]
+        [data-testid="stTextInput"] label p {
+            color: #f1eee6 !important;
+        }
+
+        div[data-testid="stDialog"]
+        [data-testid="stTextInput"] [data-baseweb="input"]:focus-within {
+            border-color: #c4d3b4 !important;
+            box-shadow: 0 0 0 2px #c4d3b433 !important;
+        }
+
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 def close_generator_popup():
@@ -197,189 +289,169 @@ def close_key_popup():
     st.session_state.key_open = False
 
 # Generator Popup Interface  
-@st.dialog("Emergency Generator", width="small", on_dismiss=close_generator_popup)
-def generator_popup():
+# Update the switches before the controls redraw.
+def press_generator_switch(switch_number):
+    st.session_state.wrong_switch = False
 
-    # Friendly caption to the player 
-    st.caption(
-        "The power is off. Find the correct startup sequence."
+    # Ignore switches that are already on.
+    if st.session_state.switches[switch_number - 1]:
+        return
+
+    correct = turn_switch(
+        st.session_state.switches,
+        correct_switches_order,
+        st.session_state.current_order,
+        switch_number
     )
 
-    # Root path 
-    ROOT = Path(__file__).resolve().parents[2]
+    if not correct:
+        st.session_state.switches = reset_generator()
+        st.session_state.current_order = []
+        st.session_state.wrong_switch = True
+
+
+def reset_generator_controls():
+    st.session_state.switches = reset_generator()
+    st.session_state.current_order = []
+    st.session_state.wrong_switch = False
+
+
+# Only these controls redraw when a switch is pressed.
+@st.fragment
+def generator_controls():
+    with st.container(key="generator_switch_controls"):
+        columns = st.columns(5, gap="small")
+
+        for i, column in enumerate(columns):
+            with column:
+                is_on = st.session_state.switches[i]
+
     
-    # Generator and note image
-    st.image(
-        str(ROOT / "assets" / "images" / "room_1" / "generator_note_puzzle.png"),
-        use_container_width=True
-    )
 
-    # Display a wrong message if the chosen switch is wrong (If Wrong Switch = True then display error message)
-    if st.session_state.wrong_switch:
-
-        st.error("Wrong sequence. The switches have reset.")
-        st.session_state.wrong_switch = False
-
-
-    # Switch buttons 
-
-    switch_columns = st.columns(5)
-
-    switch_numbers = ["1", "2", "3", "4", "5"]
-
-
-    for i, column in enumerate(switch_columns):
-
-        with column:
-
-            is_on = st.session_state.switches[i]
-
-            st.markdown(
-                f"<div style='text-align:center;'>Switch {switch_numbers[i]}</div>",
-                unsafe_allow_html=True
-            )
-
-            if st.button( 
-                "ON" if is_on else "OFF",
-                icon=":material/toggle_on:" if is_on else ":material/toggle_off:",
-                key=f"switch_{i + 1}",
-                use_container_width=True,
-                disabled=is_on
-                ):
-                
-                correct = turn_switch(
-                    st.session_state.switches,
-                    correct_switches_order,
-                    st.session_state.current_order,
-                    i + 1
+                st.button(
+                    "ON" if is_on else "OFF",
+                    key=f"switch_{i + 1}",
+                    use_container_width=True,
+                    disabled=is_on,
+                    on_click=press_generator_switch,
+                    args=(i + 1,)
                 )
 
+    # Keep this space reserved so messages don't move the buttons.
+    message = st.empty()
 
-                # Reset if the player selects the wrong switch
-                if correct == False:
-
-                    st.session_state.switches = reset_generator()
-                    st.session_state.current_order = []
-                    st.session_state.wrong_switch = True
-
-                # Not refresh the page 
-                st.rerun(scope="fragment")
-
-
-    st.caption(
-        "Follow the note and activate the switches in the correct order."
-    )
-
-
-    # Start generator button 
+    if st.session_state.wrong_switch:
+        message.error("Wrong sequence. The switches have reset.")
+    else:
+        message.caption(
+            "Follow the note and activate the switches in order."
+        )
 
     if st.button(
         "Start generator",
         type="primary",
         icon=":material/power_settings_new:",
-        use_container_width=True
+        use_container_width=True,
+        key="generator_start"
     ):
-
         if all(st.session_state.switches):
-
-            # Display success message and after 2 seconds close the popup
-            st.success("Correct order! The generator is running.")
-            time.sleep(2)
-
-            # Connect the solved puzzle to the game navigation
             navigations.mark_solved("generator")
+            st.success("Correct sequence! The generator is running.")
 
-            # Move from the dark basement to the lit basement
+            time.sleep(2.5)
+
+            close_generator_popup()
             st.session_state.page = "basement2"
-
-            # Set generator_open = False to close the popup 
-            st.session_state.generator_open = False
             st.rerun()
-
         else:
+            message.error("Complete the startup sequence first.")
 
-            st.error("It didn't start. Complete the startup sequence first.")
-
-
-    # Reset button 
-
-    if st.button(
+    st.button(
         "Reset switches",
         icon=":material/restart_alt:",
-        use_container_width=True
-    ):
+        use_container_width=True,
+        key="generator_reset",
+        on_click=reset_generator_controls
+    )
 
-        st.session_state.switches = reset_generator()
-        st.session_state.current_order = []
-        st.session_state.wrong_switch = False
 
-        st.rerun(scope="fragment")
+# Generator Popup Interface
+@st.dialog(
+    "Emergency Generator",
+    width="small",
+    on_dismiss=close_generator_popup
+)
+def generator_popup():
+    apply_style()
+
+    st.caption("Find the correct startup sequence.")
+
+    show_picture("generator_note_puzzle.webp")
+
+    generator_controls()
 
 
 
 # Boxes Popup Interface 
-@st.dialog("Storage Boxes", width="small", on_dismiss=close_boxes_popup)
-def boxes_popup():
+# Update only the answer controls when submitted.
+@st.fragment
+def boxes_controls():
+    with st.form("storage_boxes_form"):
+        columns = st.columns(3)
 
-    # Friendly caption to the player
-    st.caption(
-        "Check the inspection labels and solve the equations."
-    )
-    # Root path 
-    ROOT = Path(__file__).resolve().parents[2]
-    
-    # Boxes and note image
-    st.image(
-        str(ROOT / "assets" / "images" / "room_1" / "boxes_note_puzzle.png"),
-        use_container_width=True
-    )
+        with columns[0]:
+            answer_1 = st.text_input("Number 1")
 
-    # Player inputs
-    input_columns = st.columns(3)
+        with columns[1]:
+            answer_2 = st.text_input("Number 2")
 
-    with input_columns[0]:
-        answer_1 = st.text_input("Number 1")
-        
-    with input_columns[1]:
-        answer_2 = st.text_input("Number 2")
-        
-    with input_columns[2]:
-        answer_3 = st.text_input("Number 3")
+        with columns[2]:
+            answer_3 = st.text_input("Number 3")
 
-    # Submit button
-    if st.button(
-        "Submit",
-        type="primary",
-        icon=":material/arrow_forward:",
-        use_container_width=True
-    ):
+        submitted = st.form_submit_button(
+            "Submit",
+            type="primary",
+            use_container_width=True
+        )
 
-        # First check if user entered all answers or not 
-        if not (answer_1.isdigit() and answer_2.isdigit() and answer_3.isdigit()):
-            st.error("Enter the full three answers.")
-
-        else :
-            player_answer = (int(answer_1), int(answer_2), int(answer_3))
+    if submitted:
+        if not (
+            answer_1.isdigit()
+            and answer_2.isdigit()
+            and answer_3.isdigit()
+        ):
+            st.error("Enter all three answers.")
+        else:
+            player_answer = (
+                int(answer_1),
+                int(answer_2),
+                int(answer_3)
+            )
 
             if check_answer(player_answer):
-
-                # Display success message and after 2 seconds close the popup
-                st.success("Correct answer. You solved the puzzle")
-                time.sleep(2)
-
-                # Connect the solved puzzle to the game navigation
                 navigations.mark_solved("boxes")
+                st.success("Correct! You solved the storage boxes puzzle.")
 
-                st.session_state.boxes_open = False
+                time.sleep(2.5)
+
+                close_boxes_popup()
                 st.rerun()
-            else:
-                st.error("Incorrect. Check the labels and try again.")
 
+@st.dialog(
+    "Storage Boxes",
+    width="small",
+    on_dismiss=close_boxes_popup
+)
+def boxes_popup():
+    apply_style()
+    st.caption("Check the inspection labels and solve the equations.")
+    show_picture("boxes_note_puzzle.webp")
+    boxes_controls()
 
 # Mirror Popup Interface  
 @st.dialog("Mirror", width="small", on_dismiss=close_mirror_popup)
 def mirror_popup(): 
-    # Friendly caption to the player
+    apply_style()
     st.caption("The reflection doesn't look right.")
 
     # Root path 
@@ -391,30 +463,7 @@ def mirror_popup():
         # Connect the solved puzzle to the game navigation
         navigations.mark_solved("mirror")
 
-        # Smooth reveal animation
-        st.markdown(
-            """
-            <style>
-            @keyframes mirror_reveal {
-                from {
-                    opacity: 0;
-                    transform: scale(0.97);
-                }
-                to {
-                    opacity: 1;
-                    transform: scale(1);
-                }
-            }
-
-            div[data-testid="stDialog"] [data-testid="stImage"] img {
-                animation: mirror_reveal 0.5s ease-out;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-
-        st.image(str(ROOT / "assets" / "images" / "room_1" / "mirror_wholePart.png"),use_container_width=True)
+        show_picture("mirror_wholePart.webp")
 
         st.html(
             """
@@ -443,47 +492,39 @@ def mirror_popup():
     col1, col2, col3 = st.columns(3, gap="small")
 
     with col1: 
-        display_mirror_image(ROOT / "assets" / "images" / "room_1" / "mirror_part_1.png",1)
+        display_mirror_image(ROOT / "assets" / "images" / "room_1" / "mirror_part_1.webp",1)
         if st.button("Rotate", icon=":material/rotate_right:", key="mirror_button_1", use_container_width=True):
             rotate_mirror(st.session_state.mirror_parts_status, 1)
             st.rerun(scope="fragment")
 
     with col2: 
-        display_mirror_image(ROOT / "assets" / "images" / "room_1" / "mirror_part_2.png",2)
+        display_mirror_image(ROOT / "assets" / "images" / "room_1" / "mirror_part_2.webp",2)
         if st.button("Rotate", icon=":material/rotate_right:", key="mirror_button_2", use_container_width=True):
             rotate_mirror(st.session_state.mirror_parts_status, 2)
             st.rerun(scope="fragment")
 
     
     with col3: 
-        display_mirror_image(ROOT / "assets" / "images" / "room_1" / "mirror_part_3.png",3)
+        display_mirror_image(ROOT / "assets" / "images" / "room_1" / "mirror_part_3.webp",3)
         if st.button("Rotate", icon=":material/rotate_right:", key="mirror_button_3", use_container_width=True):
             rotate_mirror(st.session_state.mirror_parts_status, 3)
             st.rerun(scope="fragment")
 
 
 # Key Cabinet Popup Interface  
+# Key Cabinet Popup Interface
 @st.dialog("Key Cabinet", width="small", on_dismiss=close_key_popup)
-def key_popup(): 
-    # Friendly caption to the player
-    st.caption(
-        "A three-digit lock secures the cabinet."
-    )
+def key_popup():
+    apply_style()
 
-    # Root path 
-    ROOT = Path(__file__).resolve().parents[2]
-        
-    left, center, right = st.columns([1, 1.5, 1])
-    
-    #with center:
-    #    st.image(str(ROOT / "assets" / "images" / "room_1" / "key_cabinet.png"),width=210)
-    with center:
-        if st.session_state.key_cabinet_opened:
-            st.image(str(ROOT / "assets" / "images" / "room_1" / "key.png"),width=250)
-        else:
-            st.image(str(ROOT / "assets" / "images" / "room_1" / "key_cabinet.png"),width=250)
+    st.caption("A three-digit lock secures the cabinet.")
 
-    # Set three columns for each input code from the player 
+    if st.session_state.key_cabinet_opened:
+        show_picture("key.webp", max_width=250)
+    else:
+        show_picture("key_cabinet.webp", max_width=250)
+
+    # Set three columns for each input code from the player
     col1, col2, col3 = st.columns(3, gap="small")
 
     with col1: 
@@ -574,7 +615,7 @@ def display_mirror_image(image_path, mirror_number):
     st.html(
         f"""
         <img
-            src="data:image/png;base64,{image_html}"
+            src="data:image/webp;base64,{image_html}"
             style="
                 width: 100%;
                 height: auto;

@@ -48,7 +48,7 @@ def show_picture(file_name, x, y, width, height, max_width=360):
     <div class="puzzle-picture" role="img" aria-label="Puzzle close-up"
          style="width:min(100%, {max_width}px);
                 aspect-ratio:{width}/{height};
-                background-image:url('data:image/png;base64,{picture}');
+                background-image:url('data:image/webp;base64,{picture}');
                 background-size:{picture_width}% auto;
                 background-position:{picture_left}% {picture_top}%;
                 background-repeat:no-repeat;">

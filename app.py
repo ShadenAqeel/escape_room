@@ -5,6 +5,14 @@ from game.rooms import room_1, room_3, room_4
 from story import Story
 
 
+def open_basement_popup(name):
+    for popup in ("generator", "boxes", "mirror", "key"):
+        st.session_state[f"{popup}_open"] = popup == name
+
+
+def open_study_popup(name):
+    st.session_state.study_popup = name
+
 # Settings
 st.set_page_config(page_title="The Last Door", page_icon="🚪", layout="wide")
 
@@ -168,7 +176,7 @@ def room_header(name, progress):
 # Interface 1: introduction
 if st.session_state.page == "name":
 
-    set_background("intro.jpeg")
+    set_background("intro.webp")
 
     # Title format and style
     st.markdown("""<style>
@@ -351,59 +359,74 @@ if st.session_state.page == "message":
     st.stop()
 
 
-# interface Basement (dark): the only thing to click is the electrical box
+# Dark basement
 if st.session_state.page == "basement":
-
-    set_background("Basement_dark.png")
+    set_background("Basement_dark.webp")
     room_header("Basement", navigations.progress_text("basement"))
     navigations.show_navigations()
 
     st.markdown("""
     <style>
-    /* where the button sits on the room */
     .st-key-hotspot_kit {
-        position: fixed;
+        position: fixed !important;
         top: 61vh;
         left: 38.5vw;
+        width: auto !important;
+        z-index: 5;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    if st.button("Electricity", key="hotspot_kit"):
+    st.button(
+        "Electricity",
+        key="hotspot_kit",
+        on_click=open_basement_popup,
+        args=("generator",)
+    )
+
+    if st.session_state.generator_open:
         room_1.generator_popup()
 
     st.stop()
 
 
-# interface Basement lit: boxes, mirror, key cabinet, then the door
+# Lit basement
 if st.session_state.page == "basement2":
-
-    set_background("Basement.png")
+    set_background("Basement.webp")
     room_header("Basement", navigations.progress_text("basement"))
     navigations.show_navigations()
 
     st.markdown("""
     <style>
+    .st-key-hotspot_boxes,
+    .st-key-hotspot_mirror,
+    .st-key-hotspot_key,
+    .st-key-hotspot_door {
+        position: fixed !important;
+        width: auto !important;
+        z-index: 5;
+    }
+
     .st-key-hotspot_boxes {
-        position: fixed;
         top: 43vh;
         left: 8vw;
     }
+
     .st-key-hotspot_mirror {
-        position: fixed;
         top: 22vh;
         left: 45vw;
     }
+
     .st-key-hotspot_key {
-        position: fixed;
         top: 24vh;
         left: 66.5vw;
     }
+
     .st-key-hotspot_door {
-        position: fixed;
         top: 11vh;
         left: 80.5vw;
     }
+
     .st-key-hotspot_door button {
         opacity: 0;
         width: 150px;
@@ -413,22 +436,43 @@ if st.session_state.page == "basement2":
     </style>
     """, unsafe_allow_html=True)
 
-    # Each hotspot opens its popup, the popup code lives in room_1.py
-    if st.button("Storage boxes", key="hotspot_boxes"):
-        room_1.boxes_popup()
+    st.button(
+        "Storage boxes",
+        key="hotspot_boxes",
+        on_click=open_basement_popup,
+        args=("boxes",)
+    )
 
-    if st.button("Mirror", key="hotspot_mirror"):
-        room_1.mirror_popup()
+    st.button(
+        "Mirror",
+        key="hotspot_mirror",
+        on_click=open_basement_popup,
+        args=("mirror",)
+    )
 
-    if st.button("Key cabinet", key="hotspot_key"):
-        room_1.key_popup()
+    st.button(
+        "Key cabinet",
+        key="hotspot_key",
+        on_click=open_basement_popup,
+        args=("key",)
+    )
 
-    # the door only appears after the key is found
     if navigations.is_solved("key"):
         if st.button("Open door", key="hotspot_door"):
+            st.session_state.generator_open = False
+            st.session_state.boxes_open = False
+            st.session_state.mirror_open = False
+            st.session_state.key_open = False
             st.session_state.room = "majlis"
             st.session_state.page = "message"
             st.rerun()
+
+    if st.session_state.boxes_open:
+        room_1.boxes_popup()
+    elif st.session_state.mirror_open:
+        room_1.mirror_popup()
+    elif st.session_state.key_open:
+        room_1.key_popup()
 
     st.stop()
 
@@ -438,7 +482,7 @@ if st.session_state.page == "majlis":
 
     from game.rooms import room_2_ui
 
-    set_background("Majlis.png")
+    set_background("Majlis.webp")
 
     # Same header used by the Basement
     room_header(
@@ -458,37 +502,63 @@ if st.session_state.page == "majlis":
 
 # Study: three puzzles; the safe leads to the courtyard message.
 if st.session_state.page == "study":
-    set_background("study.jpeg")
+    set_background("study.webp")
     room_header("Study", navigations.progress_text("study"))
     navigations.show_navigations()
 
     st.markdown("""
     <style>
-    .st-key-hotspot_najdi {
-        position: fixed;
-        top: 22%;
-        left: 57%;
-    }
-    .st-key-hotspot_flag {
-        position: fixed;
-        top: 57%;
-        left: 24%;
-    }
+    .st-key-hotspot_najdi,
+    .st-key-hotspot_flag,
     .st-key-hotspot_safe {
-        position: fixed;
-        top: 12%;
-        left: 44%;
+        position: fixed !important;
+        width: auto !important;
+        z-index: 5;
+    }
+
+    .st-key-hotspot_najdi {
+        top: 22vh;
+        left: 57vw;
+    }
+
+    .st-key-hotspot_flag {
+        top: 57vh;
+        left: 24vw;
+    }
+
+    .st-key-hotspot_safe {
+        top: 12vh;
+        left: 44vw;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    if st.button("Najdi pattern", key="hotspot_najdi"):
+    st.button(
+        "Najdi pattern",
+        key="hotspot_najdi",
+        on_click=open_study_popup,
+        args=("najdi",)
+    )
+
+    st.button(
+        "Founding flag",
+        key="hotspot_flag",
+        on_click=open_study_popup,
+        args=("founding",)
+    )
+
+    st.button(
+        "Saudi picture",
+        key="hotspot_safe",
+        on_click=open_study_popup,
+        args=("safe",)
+    )
+
+    if st.session_state.study_popup == "najdi":
         room_3.najdi_popup()
-
-    if st.button("Founding flag", key="hotspot_flag"):
+    elif st.session_state.study_popup == "founding":
         room_3.founding_popup()
-
-    if st.button("Saudi picture", key="hotspot_safe"):
+    elif st.session_state.study_popup == "safe":
         room_3.safe_popup()
 
     st.stop()
@@ -496,7 +566,7 @@ if st.session_state.page == "study":
 
 # Courtyard: final decision at the gate.
 if st.session_state.page == "courtyard":
-    set_background("courtyard.jpeg")
+    set_background("courtyard.webp")
     room_header("Courtyard", "Final decision")
     navigations.show_navigations()
 
@@ -519,7 +589,7 @@ if st.session_state.page == "courtyard":
 # Final outcomes from Room 4.
 if st.session_state.page in ("win", "lose"):
     if st.session_state.page == "win":
-        set_background("courtyard.jpeg")
+        set_background("courtyard.webp")
 
     room_4.show_ending(st.session_state.page)
     st.stop()

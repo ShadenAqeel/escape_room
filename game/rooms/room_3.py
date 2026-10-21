@@ -59,9 +59,28 @@ SAVED_MESSAGE = ("Saved message: \"I lost my..... \"")
 
 # Create the room's values. Called by app_try.py on EVERY run (safe to repeat).
 def setup():
-    if "room3_hints" not in st.session_state:
-        st.session_state.room3_hints = {"najdi": 0, "founding": 0, "safe": 0}
+    if "study_popup" not in st.session_state:
+        st.session_state.study_popup = ""
 
+    if "room3_hints" not in st.session_state:
+        st.session_state.room3_hints = {
+            "najdi": 0,
+            "founding": 0,
+            "safe": 0
+        }
+
+def close_study_popup():
+    st.session_state.study_popup = ""
+
+
+def close_button():
+    if st.button(
+        "Close",
+        key="study_close_popup",
+        width="stretch"
+    ):
+        close_study_popup()
+        st.rerun()
 
 # Show a picture of this room
 def show_image(file_name, width="stretch"):
@@ -89,22 +108,27 @@ def show_hint(puzzle):
 # Shown when the player opens a puzzle before the previous one is solved
 def locked_message(previous_name):
     st.warning(f"Solve the {previous_name} first.")
-    if st.button("Close", key="locked_close", width="stretch"):
-        st.rerun()
+    close_button()
 
 
 # Puzzle 1 Najdi Pattern: Player counts the triangles in the wall pattern.
-@st.dialog("Najdi Pattern", width="small", on_dismiss="rerun")
+@st.dialog(
+    "Najdi Pattern",
+    width="small",
+    on_dismiss=close_study_popup
+)
+
 def najdi_popup():
     if navigations.is_solved("najdi"):
         st.success("Solved. The pattern gave you the number 66.")
+        close_button()
         return
 
     st.caption("Inspect the traditional geometric wall motif near the door.")
 
     _, center, _ = st.columns([1, 2, 1])
     with center:
-        show_image("Najd-pattern.png", width=300)
+        show_image("Najd-pattern.webp", width=300)
 
     st.markdown("**Puzzle 1:** What is the total?")
     answer = st.text_input("Enter the number:", key="najdi_input").strip()
@@ -113,23 +137,32 @@ def najdi_popup():
     with submit_col:
         if st.button("Submit", type="primary", key="najdi_submit", width="stretch"):
             if check_najdi(answer):
-                st.success("Correct!")
-                time.sleep(1)
                 navigations.mark_solved("najdi")
+                st.success("Correct! The pattern gave you the number 66.")
+
+                time.sleep(2.5)
+
+                close_study_popup()
                 st.rerun()
             else:
                 st.error("Incorrect answer. Try again.")
+          
     with hint_col:
         hint_button("najdi")
 
     show_hint("najdi")
-
+    close_button()
 
 # Puzzle 2 Founding Day: Player reads the Gregorian founding year from the Saudi Founding Day emblem.
-@st.dialog("Founding Day", width="small", on_dismiss="rerun")
+@st.dialog(
+    "Founding Day",
+    width="small",
+    on_dismiss=close_study_popup
+)
 def founding_popup():
     if navigations.is_solved("founding"):
         st.success("Solved. The flag shows the year 1727.")
+        close_button()
         return
 
     if not navigations.is_solved("najdi"):
@@ -144,9 +177,12 @@ def founding_popup():
     with submit_col:
         if st.button("Submit", type="primary", key="founding_submit", width="stretch"):
             if check_founding(answer):
-                st.success("Correct!")
-                time.sleep(1)
                 navigations.mark_solved("founding")
+                st.success("Correct! The founding year is 1727.")
+
+                time.sleep(2.5)
+
+                close_study_popup()
                 st.rerun()
             else:
                 st.error("Incorrect year.")
@@ -154,25 +190,38 @@ def founding_popup():
         hint_button("founding")
 
     show_hint("founding")
+    close_button()
 
     # The last hint also shows the picture
     if st.session_state.room3_hints["founding"] == 3:
-        show_image("Founding_day.jpg", width=320)
+        show_image("Founding_day.webp", width=320)
 
 
 # Puzzle 3 Wall Safe Keypad: Player uses the codes from four Saudi locations and orders them from West to East.
-@st.dialog("Wall Safe Keypad", width="small", on_dismiss="rerun")
+@st.dialog(
+    "Wall Safe Keypad",
+    width="small",
+    on_dismiss=close_study_popup
+)
 def safe_popup():
     # Already open: show what is inside
     if navigations.is_solved("safe"):
         st.success("The safe is open. Inside: the security tablet and the courtyard key.")
-        show_image("security_footage.jpeg")
+        show_image("security_footage.webp")
         st.caption("Security footage")
         st.info(SAVED_MESSAGE)
-        if st.button("Go to the courtyard", type="primary", key="safe_continue", width="stretch"):
+        if st.button(
+            "Go to the courtyard",
+            type="primary",
+            key="safe_continue",
+            width="stretch"
+        ):
+            close_study_popup()
             st.session_state.room = "courtyard"
             st.session_state.page = "message"
             st.rerun()
+
+        close_button()
         return
 
     if not navigations.is_solved("founding"):
@@ -195,10 +244,15 @@ Cipher Note: Order the location digits WEST to EAST.
         if st.button("Unlock safe", type="primary", key="safe_submit", width="stretch"):
             if check_safe(pin):
                 navigations.mark_solved("safe")
-                st.rerun(scope="fragment")   # reopen the popup, now showing the safe's content
+                st.success("Correct PIN! The safe is unlocking.")
+
+                time.sleep(2.5)
+
+                st.rerun(scope="fragment")
             else:
                 st.error("Incorrect PIN.")
     with hint_col:
         hint_button("safe")
 
     show_hint("safe")
+    close_button()

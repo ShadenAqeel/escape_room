@@ -3,6 +3,7 @@
 
 import streamlit as st
 import navigations
+import time
 from game.rooms import room_2 as room
 from game.rooms import room_2_display as display
 
@@ -43,13 +44,29 @@ def record_feedback(name, success, message):
 
 
 def show_feedback(name):
-    if name in st.session_state["feedback"]:
-        success, message = st.session_state["feedback"][name]
+    feedback = st.session_state["feedback"]
 
-        if success:
-            st.success(message)
-        else:
-            st.warning(message)
+    if name not in feedback:
+        return
+
+    success, message = feedback[name]
+
+    if not success:
+        st.warning(message)
+        return
+
+    st.success(message)
+
+    # Don't replay the success delay on future clicks.
+    feedback.pop(name, None)
+
+    if name in ("Drawer", "Key found"):
+        # Keep the reward and next-room button visible.
+        return
+
+    time.sleep(2.5)
+    close_popup()
+    st.rerun()
 
 
 def restart_level():
@@ -79,7 +96,7 @@ def continue_to_study():
 @st.dialog("Living room", width="small", on_dismiss=close_popup)
 def show_popup(name):
     if name == "Coffee table":
-        display.show_picture("coffee_table.png", 362, 254, 611, 506)
+        display.show_picture("coffee_table.webp", 362, 254, 611, 506)
 
         if game["coffee_saved"]:
             st.success("Observation saved.")
@@ -93,7 +110,7 @@ def show_popup(name):
             show_feedback(name)
 
     elif name == "Bookshelf":
-        display.show_picture("bookshelf.png", 362, 254, 611, 506)
+        display.show_picture("bookshelf.webp", 362, 254, 611, 506)
 
         if game["bookshelf_solved"]:
             st.success("Recovered word: " + game["recovered_word"])
@@ -115,7 +132,7 @@ def show_popup(name):
             show_feedback(name)
 
     elif name == "Open book":
-        display.show_picture("unicode_book.png", 257, 250, 790, 551)
+        display.show_picture("unicode_book.webp", 257, 250, 790, 551)
 
         if game["book_solved"]:
             st.success("PIN recorded in your notebook.")
@@ -141,7 +158,7 @@ def show_popup(name):
             show_feedback(name)
 
     elif name == "Book page":
-        display.show_picture("unicode_book.png", 257, 250, 790, 551)
+        display.show_picture("unicode_book.webp", 257, 250, 790, 551)
 
         if st.button("Back to puzzle", width="stretch"):
             open_popup("Open book")
@@ -151,9 +168,9 @@ def show_popup(name):
 
         with drawer_content.container():
             if game["drawer_unlocked"]:
-                display.show_picture("drawer_open.png", 364, 253, 576, 487)
+                display.show_picture("drawer_open.webp", 364, 253, 576, 487)
             else:
-                display.show_picture("drawer_closed.png", 362, 253, 611, 479)
+                display.show_picture("drawer_closed.webp", 362, 253, 611, 479)
 
                 answer = st.text_input("Six-digit PIN", key="drawer_pin")
                 unlock_column, hint_column = st.columns(2, gap="small")
@@ -168,7 +185,7 @@ def show_popup(name):
                         drawer_content.empty()
                         with drawer_content.container():
                             display.show_picture(
-                                "drawer_open.png", 364, 253, 576, 487
+                                "drawer_open.webp", 364, 253, 576, 487
                             )
 
                     record_feedback(name, success, message)
@@ -179,7 +196,7 @@ def show_popup(name):
         show_feedback(name)
 
     elif name == "Key found":
-        display.show_picture("drawer_open.png", 364, 253, 576, 487)
+        display.show_picture("drawer_open.webp", 364, 253, 576, 487)
 
         if st.button("Save photo", width="stretch"):
             success, message = room.save_photo(game)
